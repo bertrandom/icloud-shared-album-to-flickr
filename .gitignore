@@ -1,0 +1,4 @@
+.DS_Store
+config/local.json5
+node_modules
+sftp-config.json

@@ -1,0 +1,20 @@
+{
+  "name": "icloud-shared-album-to-flickr",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Bertrand Fan <bertrand@fan.net>",
+  "license": "ISC",
+  "dependencies": {
+    "config": "^1.25.1",
+    "flickr-upload": "^1.0.1",
+    "level": "^1.6.0",
+    "level-promisify": "^2.0.1",
+    "promise-queue": "^2.2.3",
+    "request": "^2.81.0",
+    "request-promise-native": "^1.0.3"
+  }
+}
