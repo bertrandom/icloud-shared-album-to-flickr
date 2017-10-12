@@ -4,6 +4,7 @@ var flickr = require('flickr-upload')(config);
 var request = require('request');
 var Queue = require('promise-queue');
 var level = require('level');
+var _chunk = require('lodash.chunk');
 
 function getBaseUrl(token) {
 
@@ -148,6 +149,11 @@ function decorateUrls(metadata, urls) {
         }
 
         if (bestDerivative) {
+
+            if (typeof urls[bestDerivative.checksum] == 'undefined') {
+                continue;
+            }
+
             var url = urls[bestDerivative.checksum];
             metadata.photos[photoId].url = url;
             metadata.photos[photoId].bestDerivative = bestDerivative;
@@ -179,51 +185,72 @@ function uploadFlickr(photo) {
 }
 
 var baseUrl = getBaseUrl(config.icloud_album_token);
+var queue = new Queue(1, Infinity);
+var leveldb = level('./photosdb');
+var db = require('level-promisify')(leveldb);
 
 getPhotoMetadata(baseUrl).then(function(metadata) {
 
-    getUrls(baseUrl, metadata.photoGuids).then(function (urls) {
+    var chunks = _chunk(metadata.photoGuids, 25);
 
-        decorateUrls(metadata, urls);
+    var processChunks = function(i){
 
-        var queue = new Queue(1, Infinity);
+        if (i < chunks.length) {
 
-        var leveldb = level('./photosdb');
-        var db = require('level-promisify')(leveldb);
+            getUrls(baseUrl, chunks[i]).then(function (urls) {
 
-        var checks = [];
+                decorateUrls(metadata, urls);
 
-        for (var photoGuid in metadata.photos) {
+                processChunks(i+1);
 
-            (function() {
+            });
 
-                var photoGuid = this;
-                db.get(photoGuid, function (err, value) {
+        } else {
 
-                    if (err) {
+            for (var photoGuid in metadata.photos) {
 
-                        var photo = metadata.photos[photoGuid];
+                (function() {
 
-                        var generator = function() {
-                            return uploadFlickr(photo);
-                        };
+                    var photoGuid = this;
+                    db.get(photoGuid, function (err, value) {
 
-                        queue.add(generator).then(function(data) {
-                            db.put(data.photo.photoGuid, data.photoId, function(err) {
-                                console.log('Uploaded ' + data.photo.photoGuid + ' as ' + data.photoId);
+                        if (err) {
+
+                            var photo = metadata.photos[photoGuid];
+
+                            var generator = function() {
+                                return uploadFlickr(photo);
+                            };
+
+                            queue.add(generator).then(function(data) {
+                                db.put(data.photo.photoGuid, data.photoId, function(err) {
+
+                                    if (err){
+                                        console.log(err);
+                                    }
+
+                                    console.log('Uploaded ' + data.photo.photoGuid + ' as ' + data.photoId);
+                                });
+                            }).catch(function(e) {
+                                console.log(e); 
                             });
-                        });
 
-                    } else {
-                        console.log('Skipping ' + photoGuid);
-                    }
+                        } else {
+                            console.log('Skipping ' + photoGuid);
+                        }
 
-                });
+                    });
 
-            }.bind(photoGuid))();
+                }.bind(photoGuid))();
+
+            }
 
         }
 
-    });
+    }
 
+    processChunks(0);
+
+}).catch(function(e) {
+    console.log(e);    
 });
