@@ -1,10 +1,11 @@
 var rp = require('request-promise-native');
 var config = require('config');
-var flickr = require('flickr-upload')(config);
+var flickrUpload = require('flickr-upload')(config);
 var request = require('request');
 var Queue = require('promise-queue');
 var level = require('level');
 var _chunk = require('lodash.chunk');
+var Flickr = require('flickr-sdk');
 
 function getBaseUrl(token) {
 
@@ -112,6 +113,8 @@ function getUrls(baseUrl, photoGuids) {
         body: dataString
     };
 
+    console.log('Retrieving URLs for ' + photoGuids[0] + ' - ' + photoGuids[photoGuids.length - 1] + '...');
+
     return rp(options).then(function (body) {
 
         var data = JSON.parse(body);
@@ -167,7 +170,7 @@ function uploadFlickr(photo) {
 
     return new Promise(function(resolve, reject) {
 
-        flickr.upload(request(photo.url), {title: photo.caption ? photo.caption : '', is_public: 0, strip_filename: true}, function(err, photoId) {
+        flickrUpload.upload(request(photo.url), {title: photo.caption ? photo.caption : '', is_public: 0, is_friend: 1, is_family: 1, strip_filename: true}, function(err, photoId) {
 
             if (err) {
                 return reject(err);
@@ -188,6 +191,13 @@ var baseUrl = getBaseUrl(config.icloud_album_token);
 var queue = new Queue(1, Infinity);
 var leveldb = level('./photosdb');
 var db = require('level-promisify')(leveldb);
+
+var flickr = new Flickr(Flickr.OAuth.createPlugin(
+    config.api_key,
+    config.api_secret,
+    config.access_token,
+    config.access_token_secret
+));
 
 getPhotoMetadata(baseUrl).then(function(metadata) {
 
@@ -230,6 +240,20 @@ getPhotoMetadata(baseUrl).then(function(metadata) {
                                     }
 
                                     console.log('Uploaded ' + data.photo.photoGuid + ' as ' + data.photoId);
+
+                                    if (config.flickr_album_id){
+
+                                        flickr.photosets.addPhoto({
+                                            photoset_id: config.flickr_album_id,
+                                            photo_id: data.photoId,
+                                        }).then(function (res) {
+                                            console.log('Added ' + data.photoId + ' to album ' + config.flickr_album_id);
+                                        }).catch(function(e) {
+                                            console.log(e);                                             
+                                        });
+
+                                    }
+
                                 });
                             }).catch(function(e) {
                                 console.log(e); 

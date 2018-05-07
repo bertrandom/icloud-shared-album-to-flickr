@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "config": "^1.25.1",
+    "flickr-sdk": "^3.7.0",
     "flickr-upload": "^1.0.1",
     "level": "^1.6.0",
     "level-promisify": "^2.0.1",
