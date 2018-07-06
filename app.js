@@ -211,7 +211,9 @@ getPhotoMetadata(baseUrl).then(function(metadata) {
 
                 decorateUrls(metadata, urls);
 
-                processChunks(i+1);
+                setTimeout(function() {
+                    processChunks(i+1);
+                }, 1000);
 
             });
 
