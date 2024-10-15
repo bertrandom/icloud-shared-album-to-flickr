@@ -43,6 +43,53 @@ function getBaseUrl(token) {
 
 }
 
+function getRedirectedBaseUrl(baseUrl, token) {
+
+    var url = baseUrl + 'webstream';
+
+    var headers = {
+        'Origin': 'https://www.icloud.com',
+        'Accept-Language': 'en-US,en;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36',
+        'Content-Type': 'text/plain',
+        'Accept': '*/*',
+        'Referer': 'https://www.icloud.com/sharedalbum/',
+        'Connection': 'keep-alive'
+    };
+
+    var dataString = '{"streamCtag":null}';
+
+    var options = {
+        url: url,
+        method: 'POST',
+        headers: headers,
+        body: dataString,
+        simple: false,
+        resolveWithFullResponse: true,
+    };
+
+    return rp(options).then(function (response) {
+
+        if (response.statusCode == 330) {
+
+            var body = JSON.parse(response.body);
+
+            var newBaseUrl = 'https://';
+            newBaseUrl += body["X-Apple-MMe-Host"]
+            newBaseUrl += '/';
+            newBaseUrl += token;
+            newBaseUrl += '/sharedstreams/'
+        
+            return newBaseUrl;
+
+        }
+
+        return baseUrl;
+
+    });
+
+}
+
 function getPhotoMetadata(baseUrl) {
 
     var url = baseUrl + 'webstream';
@@ -199,84 +246,92 @@ var flickr = new Flickr(Flickr.OAuth.createPlugin(
     config.access_token_secret
 ));
 
-getPhotoMetadata(baseUrl).then(function(metadata) {
+getRedirectedBaseUrl(baseUrl, config.icloud_album_token).then(function(newBaseUrl) {
 
-    var chunks = _chunk(metadata.photoGuids, 25);
-
-    var processChunks = function(i){
-
-        if (i < chunks.length) {
-
-            getUrls(baseUrl, chunks[i]).then(function (urls) {
-
-                decorateUrls(metadata, urls);
-
-                setTimeout(function() {
-                    processChunks(i+1);
-                }, 1000);
-
-            });
-
-        } else {
-
-            for (var photoGuid in metadata.photos) {
-
-                (function() {
-
-                    var photoGuid = this;
-                    db.get(photoGuid, function (err, value) {
-
-                        if (err) {
-
-                            var photo = metadata.photos[photoGuid];
-
-                            var generator = function() {
-                                return uploadFlickr(photo);
-                            };
-
-                            queue.add(generator).then(function(data) {
-                                db.put(data.photo.photoGuid, data.photoId, function(err) {
-
-                                    if (err){
-                                        console.log(err);
-                                    }
-
-                                    console.log('Uploaded ' + data.photo.photoGuid + ' as ' + data.photoId);
-
-                                    if (config.flickr_album_id){
-
-                                        flickr.photosets.addPhoto({
-                                            photoset_id: config.flickr_album_id,
-                                            photo_id: data.photoId,
-                                        }).then(function (res) {
-                                            console.log('Added ' + data.photoId + ' to album ' + config.flickr_album_id);
-                                        }).catch(function(e) {
-                                            console.log(e);                                             
-                                        });
-
-                                    }
-
-                                });
-                            }).catch(function(e) {
-                                console.log(e); 
-                            });
-
-                        } else {
-                            console.log('Skipping ' + photoGuid);
-                        }
-
-                    });
-
-                }.bind(photoGuid))();
-
-            }
-
-        }
-
+    if (newBaseUrl != baseUrl) {
+        baseUrl = newBaseUrl;
     }
 
-    processChunks(0);
+    getPhotoMetadata(baseUrl).then(function(metadata) {
 
-}).catch(function(e) {
-    console.log(e);    
+        var chunks = _chunk(metadata.photoGuids, 25);
+    
+        var processChunks = function(i){
+    
+            if (i < chunks.length) {
+    
+                getUrls(baseUrl, chunks[i]).then(function (urls) {
+    
+                    decorateUrls(metadata, urls);
+    
+                    setTimeout(function() {
+                        processChunks(i+1);
+                    }, 1000);
+    
+                });
+    
+            } else {
+    
+                for (var photoGuid in metadata.photos) {
+    
+                    (function() {
+    
+                        var photoGuid = this;
+                        db.get(photoGuid, function (err, value) {
+    
+                            if (err) {
+    
+                                var photo = metadata.photos[photoGuid];
+    
+                                var generator = function() {
+                                    return uploadFlickr(photo);
+                                };
+    
+                                queue.add(generator).then(function(data) {
+                                    db.put(data.photo.photoGuid, data.photoId, function(err) {
+    
+                                        if (err){
+                                            console.log(err);
+                                        }
+    
+                                        console.log('Uploaded ' + data.photo.photoGuid + ' as ' + data.photoId);
+    
+                                        if (config.flickr_album_id){
+    
+                                            flickr.photosets.addPhoto({
+                                                photoset_id: config.flickr_album_id,
+                                                photo_id: data.photoId,
+                                            }).then(function (res) {
+                                                console.log('Added ' + data.photoId + ' to album ' + config.flickr_album_id);
+                                            }).catch(function(e) {
+                                                console.log(e);                                             
+                                            });
+    
+                                        }
+    
+                                    });
+                                }).catch(function(e) {
+                                    console.log(e); 
+                                });
+    
+                            } else {
+                                console.log('Skipping ' + photoGuid);
+                            }
+    
+                        });
+    
+                    }.bind(photoGuid))();
+    
+                }
+    
+            }
+    
+        }
+    
+        processChunks(0);
+    
+    }).catch(function(e) {
+        console.log(e);    
+    });    
+
 });
