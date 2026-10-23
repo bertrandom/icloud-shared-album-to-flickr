@@ -1,0 +1,18 @@
+{
+  "local": {
+    "api_key": "xxx",
+    "api_secret": "xxx",
+    "access_token": "xxx-xxx",
+    "access_token_secret": "xxx",
+    "icloud_album_token": "xxx",
+    "flickr_album_id": ""
+  },
+  "prod": {
+    "api_key": "xxx",
+    "api_secret": "xxx",
+    "access_token": "xxx-xxx",
+    "access_token_secret": "xxx",
+    "icloud_album_token": "xxx",
+    "flickr_album_id": ""
+  }
+}

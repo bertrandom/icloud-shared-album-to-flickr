@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local state
+config/settings.json
+photos.db
+logs/
+leveldb.json
+.sync.lock
+scripts/node_modules
+.DS_Store
+.mypy_cache/

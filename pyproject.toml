@@ -1,0 +1,11 @@
+[project]
+name = "icloud-shared-album-to-flickr"
+version = "0.1.0"
+description = "Sync photos from an iCloud Shared Album to Flickr"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dynaconf>=3.3.5",
+    "requests>=2.34.2",
+    "requests-oauthlib>=2.0.0",
+]
