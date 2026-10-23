@@ -12,7 +12,7 @@ import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlencode
 
 import requests
 from dynaconf import Dynaconf
@@ -165,7 +165,7 @@ class Flickr:
             config["access_token_secret"],
         )
 
-    def upload(self, fileobj, filename, title):
+    def upload(self, fileobj, title):
         params = {
             "title": title,
             "is_public": "0",
@@ -189,7 +189,9 @@ class Flickr:
         resp = requests.post(
             FLICKR_UPLOAD_URL,
             data=params,
-            files={"photo": (filename, fileobj)},
+            # A blank filename keeps Flickr from using it as the title (e.g.
+            # "IMG_6213") when there's no caption.
+            files={"photo": (" ", fileobj)},
             headers={"Authorization": headers["Authorization"]},
             timeout=600,
         )
@@ -226,14 +228,13 @@ class Flickr:
 
 
 def upload_photo(flickr, photo, url):
-    filename = os.path.basename(urlparse(url).path) or f"{photo['photoGuid']}.jpg"
     with requests.get(url, stream=True, timeout=120) as resp:
         resp.raise_for_status()
         with tempfile.SpooledTemporaryFile(max_size=50 * 1024 * 1024) as tmp:
             for chunk in resp.iter_content(1024 * 1024):
                 tmp.write(chunk)
             tmp.seek(0)
-            return flickr.upload(tmp, filename, photo.get("caption") or "")
+            return flickr.upload(tmp, photo.get("caption") or "")
 
 
 def sync(config, db, dry_run=False):
