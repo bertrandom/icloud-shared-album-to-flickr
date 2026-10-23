@@ -1,7 +1,7 @@
 # icloud-shared-album-to-flickr
 
 Syncs photos from an iCloud Shared Album to Flickr. Python rewrite of
-[icloud-shared-album-to-flickr-nodejs](../icloud-shared-album-to-flickr-nodejs).
+[icloud-shared-album-to-flickr-nodejs](https://github.com/bertrandom/icloud-shared-album-to-flickr-nodejs).
 
 Apple has no API for iCloud Shared Albums, so this mimics the requests the
 public album website makes. For each photo it uploads the largest derivative to
