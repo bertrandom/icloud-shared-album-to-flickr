@@ -27,6 +27,10 @@ LOCK_PATH = ROOT / ".sync.lock"
 URL_CHUNK_SIZE = 25
 URL_CHUNK_DELAY = 1.0
 
+# iCloud takes ~50s to answer webstream, so leave plenty of headroom.
+ICLOUD_TIMEOUT = 180
+ICLOUD_ATTEMPTS = 2
+
 FLICKR_UPLOAD_URL = "https://up.flickr.com/services/upload/"
 FLICKR_REST_URL = "https://api.flickr.com/services/rest"
 
@@ -109,15 +113,25 @@ def get_base_url(token):
     return f"https://p{partition:02d}-sharedstreams.icloud.com/{token}/sharedstreams/"
 
 
+def icloud_post(session, url, **kwargs):
+    for attempt in range(1, ICLOUD_ATTEMPTS + 1):
+        try:
+            return session.post(url, timeout=ICLOUD_TIMEOUT, **kwargs)
+        except (requests.Timeout, requests.ConnectionError) as e:
+            if attempt == ICLOUD_ATTEMPTS:
+                raise
+            log.warning("iCloud request to %s failed (%s), retrying", url, e)
+
+
 def get_photo_metadata(session, base_url, token):
     """Return (base_url, photos) where photos maps photoGuid -> photo dict."""
-    resp = session.post(base_url + "webstream", data='{"streamCtag":null}', timeout=60)
+    resp = icloud_post(session, base_url + "webstream", data='{"streamCtag":null}')
 
     # iCloud answers 330 with the host that actually serves this album.
     if resp.status_code == 330:
         host = resp.json()["X-Apple-MMe-Host"]
         base_url = f"https://{host}/{token}/sharedstreams/"
-        resp = session.post(base_url + "webstream", data='{"streamCtag":null}', timeout=60)
+        resp = icloud_post(session, base_url + "webstream", data='{"streamCtag":null}')
 
     resp.raise_for_status()
     photos = {p["photoGuid"]: p for p in resp.json()["photos"]}
@@ -125,9 +139,7 @@ def get_photo_metadata(session, base_url, token):
 
 
 def get_urls(session, base_url, photo_guids):
-    resp = session.post(
-        base_url + "webasseturls", json={"photoGuids": photo_guids}, timeout=60
-    )
+    resp = icloud_post(session, base_url + "webasseturls", json={"photoGuids": photo_guids})
     resp.raise_for_status()
     return {
         checksum: f"https://{item['url_location']}{item['url_path']}"
